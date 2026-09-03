@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Boroda Barrage</title>
+<style>
+  :root{color-scheme:dark;--panel:#11131c;--line:#34394b;--hot:#ff456c;--soft:#bfc7e6;--gold:#ffd36b}
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#090a10;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#fff}
+  body{display:grid;place-items:center}
+  #shell{position:relative;width:min(100vw,1000px);height:min(100vh,720px);aspect-ratio:1000/720;max-height:100vh;box-shadow:0 0 60px #000;overflow:hidden;background:#05060a}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:auto}
+  #ui{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:28px;pointer-events:none}
+  .panel{pointer-events:auto;width:min(720px,94%);max-height:92%;overflow:auto;background:linear-gradient(180deg,rgba(16,18,29,.95),rgba(8,9,14,.95));border:1px solid #ffffff26;border-radius:18px;box-shadow:0 22px 70px #000c, inset 0 1px #ffffff12;padding:26px;backdrop-filter:blur(14px)}
+  .title{font-size:clamp(34px,5vw,66px);font-weight:900;letter-spacing:-.045em;line-height:.92;margin:0;text-shadow:0 5px 30px #ff315a55}
+  .sub{color:#cbd1e7;margin:10px 0 22px;line-height:1.45}
+  .menu{display:grid;gap:9px}
+  button,.btn{appearance:none;border:1px solid #ffffff22;background:#ffffff0c;color:#fff;border-radius:11px;padding:12px 14px;font-size:15px;text-align:left;cursor:pointer;transition:.15s transform,.15s background,.15s border-color}
+  button:hover{transform:translateX(3px);background:#ffffff16;border-color:#ffffff44}
+  button.primary{background:linear-gradient(90deg,#a31238,#e23a65);border-color:#ff6e8a66;font-weight:800}
+  button.danger{border-color:#ff496955;color:#ff91a5}
+  button.small{padding:8px 10px;font-size:13px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1 1 140px}
+  .muted{color:#9da6c4;font-size:13px;line-height:1.45}.tiny{font-size:11px;color:#7f89a8}
+  h2{margin:0 0 8px;font-size:25px} h3{margin:22px 0 8px;font-size:16px;color:#ffd5df}
+  input,select,textarea{width:100%;background:#070910;color:#fff;border:1px solid #34394b;border-radius:10px;padding:10px 11px;font:inherit;outline:none}
+  textarea{min-height:170px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;line-height:1.5}
+  input:focus,select:focus,textarea:focus{border-color:#ff4e76}
+  .scoreTable{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}.scoreTable th,.scoreTable td{padding:8px 6px;border-bottom:1px solid #ffffff12;text-align:left}.scoreTable th{font-size:12px;color:#9098b3;text-transform:uppercase;letter-spacing:.08em}
+  .kbd{display:inline-block;min-width:27px;padding:2px 7px;border:1px solid #ffffff35;border-bottom-width:3px;border-radius:6px;background:#ffffff0d;text-align:center;font-family:ui-monospace,monospace;font-size:12px;color:#fff}
+  #toast{position:absolute;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:#06070cdd;border:1px solid #ffffff28;border-radius:999px;padding:9px 14px;opacity:0;transition:.2s;pointer-events:none;font-size:13px;box-shadow:0 8px 30px #0008;white-space:nowrap}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .preview{height:150px;border:1px solid #ffffff1e;border-radius:12px;background:#05060b center/contain no-repeat;display:grid;place-items:center;color:#65708e;overflow:hidden}
+  .stageGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px}.stageCard{padding:13px}.stageCard strong{display:block;margin-bottom:4px}.stageCard span{color:#929bb9;font-size:12px}
+  details{border:1px solid #ffffff15;border-radius:10px;padding:10px 12px;background:#ffffff05}summary{cursor:pointer;color:#dce0f2}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:700px){.two{grid-template-columns:1fr}.panel{padding:18px}#ui{padding:10px}}
+</style>
+</head>
+<body>
+<div id="shell">
+  <canvas id="game" width="1000" height="720"></canvas>
+  <div id="ui"></div>
+  <div id="toast" class="">Добавлено 1; localStorage переполнен — сразу экспортируй</div>
+</div>
+
+<script>window.__BORODA_BUILD_JSON_PARTS__=new Array(10);</script>
+<script src="boroda-data-01.js"></script>
+<script src="boroda-data-02.js"></script>
+<script src="boroda-data-03.js"></script>
+<script src="boroda-data-04.js"></script>
+<script src="boroda-data-05.js"></script>
+<script src="boroda-data-06.js"></script>
+<script src="boroda-data-07.js"></script>
+<script src="boroda-data-08.js"></script>
+<script src="boroda-data-09.js"></script>
+<script src="boroda-data-10.js"></script>
+<script>
+'use strict';
+/*
+  BORODA BARRAGE — single HTML bullet-hell starter/editor.
+  No external libraries, fonts, audio or network requests are required.
+
+  QUICK ASSET REPLACEMENT IN SOURCE:
+  Put a URL, relative path, or data:image/... URL into USER_ASSETS below.
+  Example:
+    player: 'data:image/png;base64,...'
+    bg1: './my_background.png'
+  Leaving a slot empty uses the built-in placeholder SVG.
+
+  In editor mode you can replace images, menu/stage music and dialogues from the in-game menu.
+  Press the export button there to bake the current project into a standalone final HTML.
+*/
+// BUILD is rewritten automatically when you press "Экспортировать готовую игру".
+// In a final build editor=false, custom assets/music/dialogues are baked into this object.
+const BUILD = JSON.parse((window.__BORODA_BUILD_JSON_PARTS__ || []).join(''));
+const USER_ASSETS = BUILD.assets || {};
+const USER_AUDIO = BUILD.audio || {};
+
+const GAME_TITLE = 'BORODA BARRAGE';
+const VERSION = BUILD.editor ? '2.10 editor/export' : '2.10 final';
+const STORAGE = { scores:'crimsonBarrage.scores.v1', assets:'crimsonBarrage.assets.v1', dialog:'crimsonBarrage.dialog.v2_7', audio:'crimsonBarrage.audio.v1', credits:'borodaBarrage.credits.v2_7', spinText:'borodaBarrage.spinText.v1', stageComments:'borodaBarrage.stageComments.v2_7', stageDurations:'borodaBarrage.stageDurations.v1', creditsImages:'borodaBarrage.creditsImages.v2_10' };
+
+const STAGES = [
+  {
+    "name": "Stage 1",
+    "title": "Продуктовые сумерки",
+    "boss": "Людка",
+    "duration": 34,
+    "bg": "bg1",
+    "bossSlot": "boss1",
+    "portrait": "portraitBoss1"
+  },
+  {
+    "name": "Stage 2",
+    "title": "Долг на углу",
+    "boss": "Ушлый хохол",
+    "duration": 35,
+    "bg": "bg2",
+    "bossSlot": "boss2",
+    "portrait": "portraitBoss2"
+  },
+  {
+    "name": "Stage 3",
+    "title": "Двор клуба Черных Кобр",
+    "boss": "Гена Мункхольм",
+    "duration": 36,
+    "bg": "bg3",
+    "bossSlot": "boss3",
+    "portrait": "portraitBoss3"
+  },
+  {
+    "name": "Stage 4",
+    "title": "Инцидент с флагом",
+    "boss": "Господин Фам",
+    "duration": 37,
+    "bg": "bg4",
+    "bossSlot": "boss4",
+    "portrait": "portraitBoss4"
+  }
+];
+
+const DEFAULT_DIALOGUES = BUILD.dialogues || [];
+
+const $ = s => document.querySelector(s);
+const ui = $('#ui'), canvas = $('#game'), ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height, FIELD_W = 720, SIDE_X = 720;
+const keys = new Set();
+let pressed = new Set();
+let toastTimer = 0;
+
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1700); }
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function rand(a,b){return a+Math.random()*(b-a);}
+function lerp(a,b,t){return a+(b-a)*t;}
+function dist2(ax,ay,bx,by){const x=ax-bx,y=ay-by; return x*x+y*y;}
+function fmtScore(n){return Math.max(0,Math.floor(n)).toString().padStart(9,'0');}
+function svgData(svg){return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);}
+
+function defaultAssetMap(){
+  const player = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 96"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#ff476f"/><stop offset="1" stop-color="#a8002d"/></linearGradient></defs><path d="M40 5 52 25 75 29 60 47 65 77 40 64 15 77 20 47 5 29 28 25Z" fill="url(#g)" stroke="#fff" stroke-width="3"/><circle cx="40" cy="39" r="10" fill="#ffe9d5"/><path d="M18 85 31 56h18l13 29-22-8Z" fill="#f7f3ff"/><circle cx="40" cy="55" r="3" fill="#ff234e"/></svg>`);
+  const enemy1 = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 4 42 20 60 24 47 37 50 56 32 48 14 56 17 37 4 24 22 20Z" fill="#8c78ff" stroke="#e8e2ff" stroke-width="3"/><circle cx="32" cy="31" r="7" fill="#19142b"/></svg>`);
+  const enemy2 = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="25" fill="#54d3df" stroke="#eaffff" stroke-width="3"/><path d="M9 31h46M32 9v46M16 16l32 32M48 16 16 48" stroke="#173a53" stroke-width="5"/><circle cx="32" cy="32" r="8" fill="#fff"/></svg>`);
+  const enemy3 = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 5 58 54H6Z" fill="#ffbe4c" stroke="#fff1bd" stroke-width="3"/><path d="M32 16 42 48H22Z" fill="#9b3b32"/></svg>`);
+  const boss = (c1,c2,mark)=>svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 170"><defs><radialGradient id="a"><stop stop-color="${c2}"/><stop offset="1" stop-color="${c1}"/></radialGradient></defs><circle cx="70" cy="52" r="30" fill="#ffe9d8"/><path d="M39 52Q70 5 101 52L93 22Q70 0 47 22Z" fill="${c1}"/><path d="M31 155 46 75h48l15 80-39-18Z" fill="url(#a)" stroke="#fff" stroke-width="4"/><path d="M22 80 48 92M118 80 92 92" stroke="#fff" stroke-width="15" stroke-linecap="round"/><circle cx="58" cy="53" r="4" fill="#222"/><circle cx="82" cy="53" r="4" fill="#222"/><text x="70" y="121" text-anchor="middle" font-size="33" font-family="serif" fill="#fff">${mark}</text></svg>`);
+  const portraitPlayer = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520"><rect width="400" height="520" fill="none"/><circle cx="210" cy="150" r="92" fill="#ffe8d4"/><path d="M100 165Q125 10 275 42L320 160Q265 102 100 165Z" fill="#2a243d"/><path d="M75 505 113 226h201l52 279Z" fill="#cf214c"/><path d="m160 235 45 70 47-70" fill="#fff"/><circle cx="175" cy="152" r="10"/><circle cx="245" cy="152" r="10"/><path d="M238 30 325 88 250 118Z" fill="#ff345d"/></svg>`);
+  const portraitBoss = (c1,c2,mark)=>svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520"><circle cx="205" cy="150" r="92" fill="#ffe9d8"/><path d="M104 157Q132 16 302 45L314 155Q254 100 104 157Z" fill="${c1}"/><path d="M70 510 110 232h205l48 278Z" fill="${c2}"/><circle cx="170" cy="151" r="10"/><circle cx="242" cy="151" r="10"/><text x="215" y="385" text-anchor="middle" font-size="150" font-family="serif" fill="#ffffffaa">${mark}</text></svg>`);
+  const bg = (a,b,c,shape)=>svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="${a}"/><stop offset=".55" stop-color="${b}"/><stop offset="1" stop-color="${c}"/></linearGradient><filter id="blur"><feGaussianBlur stdDeviation="12"/></filter></defs><rect width="720" height="720" fill="url(#g)"/><g opacity=".32" fill="none" stroke="#fff" stroke-width="2">${Array.from({length:10},(_,i)=>`<circle cx="${80+i*69}" cy="${100+(i%3)*180}" r="${30+(i%4)*18}"/>`).join('')}</g><g opacity=".12" fill="#fff" filter="url(#blur)"><circle cx="120" cy="140" r="90"/><circle cx="600" cy="410" r="130"/></g><text x="360" y="380" text-anchor="middle" fill="#ffffff15" font-size="210" font-family="serif">${shape}</text></svg>`);
+  return {
+    player, enemy1, enemy2, enemy3,
+    boss1:boss('#a50e42','#ff6381','I'), boss2:boss('#4734a8','#9f90ff','II'), boss3:boss('#145b7d','#54c9e4','III'), boss4:boss('#5e247e','#cf6cea','IV'), boss5:boss('#381018','#e02049','V'),
+    portraitPlayer,
+    portraitBoss1:portraitBoss('#97103d','#d63358','I'), portraitBoss2:portraitBoss('#423595','#7568d5','II'), portraitBoss3:portraitBoss('#16526c','#3199b1','III'), portraitBoss4:portraitBoss('#55236e','#9a49b5','IV'), portraitBoss5:portraitBoss('#2b0d15','#a11635','V'),
+    bg1:bg('#6b2332','#301a2d','#0a0d18','✦'), bg2:bg('#303063','#17214a','#080a15','❀'), bg3:bg('#1d4b57','#142936','#080b11','⌚'), bg4:bg('#45235c','#1f1b3f','#090913','☾'), bg5:bg('#6a1627','#250d18','#05060b','◆'),
+    titleBg:bg('#73172f','#2b1523','#07080e','✧')
+  };
+}
+const DEFAULT_ASSETS = defaultAssetMap();
+DEFAULT_ASSETS.spinStar = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><defs><radialGradient id="g"><stop stop-color="#fff8b0"/><stop offset=".38" stop-color="#ffd943"/><stop offset="1" stop-color="#e58916"/></radialGradient></defs><path d="M48 4 59 34 91 35 66 54 75 86 48 68 21 86 30 54 5 35 37 34Z" fill="url(#g)" stroke="#fff" stroke-width="5"/><circle cx="48" cy="48" r="10" fill="#fff5a6" opacity=".8"/></svg>`);
+DEFAULT_ASSETS.bullet1 = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><radialGradient id="g"><stop stop-color="#fff"/><stop offset=".35" stop-color="#aeb2ff"/><stop offset="1" stop-color="#5d4ee8"/></radialGradient></defs><circle cx="32" cy="32" r="23" fill="url(#g)" stroke="#fff" stroke-width="5"/></svg>`);
+DEFAULT_ASSETS.bullet2 = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><radialGradient id="g"><stop stop-color="#fff"/><stop offset=".3" stop-color="#ff9aaa"/><stop offset="1" stop-color="#e51f51"/></radialGradient></defs><circle cx="35" cy="31" r="21" fill="url(#g)" stroke="#fff" stroke-width="4"/><circle cx="18" cy="36" r="9" fill="#ff617c" stroke="#fff" stroke-width="3"/></svg>`);
+DEFAULT_ASSETS.bullet3 = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><path d="M32 5 58 55H6Z" fill="#52d9ff" stroke="#fff" stroke-width="5"/><path d="M32 17 43 47H21Z" fill="#187aa4" opacity=".65"/></svg>`);
+DEFAULT_ASSETS.bullet4 = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 80"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#fff4ad"/><stop offset=".45" stop-color="#ffd64e"/><stop offset="1" stop-color="#dc8613"/></linearGradient></defs><ellipse cx="24" cy="40" rx="14" ry="33" fill="url(#g)" stroke="#fff" stroke-width="5"/></svg>`);
+DEFAULT_ASSETS.bullet5 = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 76"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="#fff"/><stop offset=".3" stop-color="#ef9cff"/><stop offset="1" stop-color="#a42ed2"/></linearGradient></defs><path d="M32 4 58 38 32 72 6 38Z" fill="url(#g)" stroke="#fff" stroke-width="5"/></svg>`);
+DEFAULT_ASSETS.bullet6 = svgData(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72"><defs><radialGradient id="g"><stop stop-color="#fff"/><stop offset=".28" stop-color="#ffe08c"/><stop offset="1" stop-color="#ff7028"/></radialGradient></defs><path d="M36 3 44 25 68 26 49 40 56 64 36 51 16 64 23 40 4 26 28 25Z" fill="url(#g)" stroke="#fff" stroke-width="5"/></svg>`);
+
+function loadJSON(k,f){try{return JSON.parse(localStorage.getItem(k)) ?? f}catch{return f}}
+function persistJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(err){console.warn('Storage write failed',err);return false}}
+function cloneJSON(v){return JSON.parse(JSON.stringify(v));}
+
+// Final builds deliberately ignore editor localStorage overrides: what was baked is what ships.
+let savedAssets = BUILD.editor ? loadJSON(STORAGE.assets, {}) : {};
+const imageCache = new Map();
+const CREDIT_FALLBACK={credits1:'titleBg',credits2:'bg1',credits3:'bg2',credits4:'bg3',credits5:'bg4',credits6:'titleBg'};
+function assetSrc(slot){
+  const direct=savedAssets[slot] || USER_ASSETS[slot] || DEFAULT_ASSETS[slot] || '';
+  if(direct)return direct;
+  const fb=CREDIT_FALLBACK[slot];
+  return fb?(savedAssets[fb]||USER_ASSETS[fb]||DEFAULT_ASSETS[fb]||''):'';
+}
+function img(slot){
+  const src=assetSrc(slot), key=slot+'|'+src;
+  if(imageCache.has(key)) return imageCache.get(key);
+  const im=new Image(); im.src=src; imageCache.set(key,im); return im;
+}
+function imgFromSrc(src){
+  const key='direct|'+src;
+  if(imageCache.has(key)) return imageCache.get(key);
+  const im=new Image(); im.src=src; imageCache.set(key,im); return im;
+}
+function setAsset(slot,src){savedAssets[slot]=src;persistJSON(STORAGE.assets,savedAssets);imageCache.clear();}
+function resetAsset(slot){delete savedAssets[slot];persistJSON(STORAGE.assets,savedAssets);imageCache.clear();}
+
+const dialogueSeed = BUILD.dialogues || DEFAULT_DIALOGUES;
+let dialogues = BUILD.editor ? loadJSON(STORAGE.dialog, cloneJSON(dialogueSeed)) : cloneJSON(dialogueSeed);
+function getDialogue(i){return Array.isArray(dialogues[i])&&dialogues[i].length?dialogues[i]:DEFAULT_DIALOGUES[i];}
+function ensureDialogueStage(i){
+  if(!Array.isArray(dialogues[i])||!dialogues[i].length)dialogues[i]=cloneJSON(DEFAULT_DIALOGUES[i]);
+  return dialogues[i];
+}
+function dialoguePortraitSrc(stageIndex,line){
+  if(line&&line.portrait)return line.portrait;
+  return assetSrc(line&&line.side==='right'?STAGES[stageIndex].portrait:'portraitPlayer');
+}
+function setDialoguePortrait(stageIndex,lineIndex,src){
+  const lines=ensureDialogueStage(stageIndex);if(!lines[lineIndex])return false;
+  if(src)lines[lineIndex].portrait=src;else delete lines[lineIndex].portrait;
+  imageCache.clear();return persistJSON(STORAGE.dialog,dialogues);
+}
+
+const DEFAULT_CREDITS=["BORODA BARRAGE", "Спасибо за игру!", "МУЗЫКА", "Menu - Touhou 6 - Scarlet Beyond a Crimson Dream", "Stage 1 - Touhou 6 - Cirno's Theme - Beloved Tomboyish Girl", "Stage 2 - Touhou 6 - Flandre Scarlet's Theme - U.N. Owen was her?", "Stage 3 - Devil May Cry 3 - Devils Never Cry", "Stage 4 - Fury of the Prince - Outro 2 (Reign the Conqueror_Alexander Senki) OST", "THE END"];
+const creditSeed=Array.isArray(BUILD.credits)&&BUILD.credits.length?BUILD.credits:DEFAULT_CREDITS;
+let credits=BUILD.editor?loadJSON(STORAGE.credits,cloneJSON(creditSeed)):cloneJSON(creditSeed);
+function saveCredits(lines){credits=lines.length?lines:cloneJSON(DEFAULT_CREDITS);return persistJSON(STORAGE.credits,credits);}
+
+
+// Editable duration of the ordinary-enemy section of each stage, in seconds.
+const DEFAULT_STAGE_DURATIONS=STAGES.map(s=>Math.max(10,Math.round(Number(s.duration)||30)));
+const stageDurationSeed=Array.isArray(BUILD.stageDurations)&&BUILD.stageDurations.length===STAGES.length?BUILD.stageDurations:DEFAULT_STAGE_DURATIONS;
+let stageDurations=BUILD.editor?loadJSON(STORAGE.stageDurations,cloneJSON(stageDurationSeed)):cloneJSON(stageDurationSeed);
+if(!Array.isArray(stageDurations)||stageDurations.length!==STAGES.length)stageDurations=cloneJSON(DEFAULT_STAGE_DURATIONS);
+function getStageDuration(i){const v=Number(stageDurations[i]);return clamp(Number.isFinite(v)?v:DEFAULT_STAGE_DURATIONS[i],10,300);}
+function saveStageDurations(values){stageDurations=STAGES.map((_,i)=>clamp(Math.round(Number(values[i])||DEFAULT_STAGE_DURATIONS[i]),10,300));return persistJSON(STORAGE.stageDurations,stageDurations);}
+function resetStageDurations(){stageDurations=cloneJSON(DEFAULT_STAGE_DURATIONS);return persistJSON(STORAGE.stageDurations,stageDurations);}
+
+// Unlimited final-credit image list. Legacy credits1..credits6 remain valid as the six default entries,
+// but the list can contain any number of uploaded/URL images.
+const DEFAULT_CREDIT_IMAGE_ENTRIES=Array.from({length:6},(_,i)=>({slot:'credits'+(i+1)}));
+const creditsImagesSeed=Array.isArray(BUILD.creditsImages)&&BUILD.creditsImages.length?BUILD.creditsImages:DEFAULT_CREDIT_IMAGE_ENTRIES;
+let creditsImages=BUILD.editor?loadJSON(STORAGE.creditsImages,cloneJSON(creditsImagesSeed)):cloneJSON(creditsImagesSeed);
+if(!Array.isArray(creditsImages)||!creditsImages.length)creditsImages=cloneJSON(DEFAULT_CREDIT_IMAGE_ENTRIES);
+function creditImageSrc(entry){if(typeof entry==='string')return entry;if(entry&&entry.src)return entry.src;if(entry&&entry.slot)return assetSrc(entry.slot);return assetSrc('titleBg');}
+function creditImageLabel(entry,i){if(entry&&entry.slot)return `${i+1}. ${entry.slot} (базовая)`;return `${i+1}. ${(entry&&entry.name)||'добавленная картинка'}`;}
+function saveCreditsImages(){return persistJSON(STORAGE.creditsImages,creditsImages);}
+function resetCreditsImages(){creditsImages=cloneJSON(DEFAULT_CREDIT_IMAGE_ENTRIES);return saveCreditsImages();}
+
+const DEFAULT_SPIN_TEXT='РАСКРУТКА';
+const spinTextSeed=(typeof BUILD.spinText==='string'&&BUILD.spinText.trim())?BUILD.spinText.trim():DEFAULT_SPIN_TEXT;
+let spinText=BUILD.editor?(localStorage.getItem(STORAGE.spinText)||spinTextSeed):spinTextSeed;
+function saveSpinText(v){spinText=(String(v||'').trim()||DEFAULT_SPIN_TEXT).slice(0,36);try{localStorage.setItem(STORAGE.spinText,spinText);return true}catch{return false}}
+
+const DEFAULT_STAGE_COMMENTS=[
+  "Оголодал совсем, надо бы проверить тот няшный комбини в японском стиле...",
+  "Долги сами себя не вернут. Значит, придётся немного пострелять.",
+  "Рис не донёс, футболку аккуратно под дверь подложил. Осталось пережить разговор с Геной.",
+  "Испортил флаг, что-то накатило... чувствую, плохо это кончится...."
+];
+const stageCommentSeed=Array.isArray(BUILD.stageComments)&&BUILD.stageComments.length===STAGES.length?BUILD.stageComments:DEFAULT_STAGE_COMMENTS;
+let stageComments=BUILD.editor?loadJSON(STORAGE.stageComments,cloneJSON(stageCommentSeed)):cloneJSON(stageCommentSeed);
+function getStageComment(i){return String(stageComments[i]??DEFAULT_STAGE_COMMENTS[i]??'').trim();}
+function saveStageComment(i,v){stageComments[i]=String(v||'').trim();return persistJSON(STORAGE.stageComments,stageComments);}
+function resetStageComment(i){stageComments[i]=DEFAULT_STAGE_COMMENTS[i]||'';return persistJSON(STORAGE.stageComments,stageComments);}
+
+
+// One looping menu track + one looping track per stage.
+// Large uploaded audio is persisted in IndexedDB (localStorage is too small for normal music files).
+let savedAudio = BUILD.editor ? loadJSON(STORAGE.audio, {}) : {};
+const AUDIO_DB_NAME='borodaBarrage.audio.v1', AUDIO_STORE='tracks';
+let audioDBPromise=null;
+function openAudioDB(){
+  if(!BUILD.editor||!('indexedDB' in window))return Promise.resolve(null);
+  if(audioDBPromise)return audioDBPromise;
+  audioDBPromise=new Promise(resolve=>{
+    try{const req=indexedDB.open(AUDIO_DB_NAME,1);
+      req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(AUDIO_STORE))db.createObjectStore(AUDIO_STORE);};
+      req.onsuccess=()=>resolve(req.result);req.onerror=()=>resolve(null);
+    }catch{resolve(null)}
+  });
+  return audioDBPromise;
+}
+async function idbPutAudio(k,src){const db=await openAudioDB();if(!db)return false;return new Promise(resolve=>{try{const tx=db.transaction(AUDIO_STORE,'readwrite');tx.objectStore(AUDIO_STORE).put(src,k);tx.oncomplete=()=>resolve(true);tx.onerror=()=>resolve(false);}catch{resolve(false)}});}
+async function idbDeleteAudio(k){const db=await openAudioDB();if(!db)return false;return new Promise(resolve=>{try{const tx=db.transaction(AUDIO_STORE,'readwrite');tx.objectStore(AUDIO_STORE).delete(k);tx.oncomplete=()=>resolve(true);tx.onerror=()=>resolve(false);}catch{resolve(false)}});}
+async function hydrateAudioFromIDB(){
+  if(!BUILD.editor)return;const db=await openAudioDB();if(!db)return;
+  const keys=['menu','credits',...STAGES.map((_,i)=>'stage'+(i+1))];
+  await Promise.all(keys.map(k=>new Promise(resolve=>{try{const tx=db.transaction(AUDIO_STORE,'readonly'),r=tx.objectStore(AUDIO_STORE).get(k);r.onsuccess=()=>{if(r.result)savedAudio[k]=r.result;resolve();};r.onerror=()=>resolve();}catch{resolve()}})));
+}
+const music = new Audio(); music.loop=true; music.preload='auto'; music.volume=.65;
+let currentMusicKey='';
+function audioKey(i){return 'stage'+(i+1)}
+function audioSrcByKey(k){return savedAudio[k] || USER_AUDIO[k] || '';}
+function audioSrc(i){return audioSrcByKey(audioKey(i));}
+function setAudioKey(k,src){
+  savedAudio[k]=src;
+  const smallOk=persistJSON(STORAGE.audio,savedAudio);
+  if(BUILD.editor)idbPutAudio(k,src);
+  return smallOk||!!src;
+}
+function resetAudioKey(k){delete savedAudio[k];persistJSON(STORAGE.audio,savedAudio);if(BUILD.editor)idbDeleteAudio(k);if(currentMusicKey===k)stopMusic();}
+function setAudio(i,src){return setAudioKey(audioKey(i),src);}
+function resetAudio(i){resetAudioKey(audioKey(i));}
+function stopMusic(){music.pause();music.removeAttribute('src');music.load();currentMusicKey='';}
+function playMusicKey(k,force=false){
+  const src=audioSrcByKey(k);if(!src){stopMusic();return;}
+  if(!force&&currentMusicKey===k&&music.src){const r=music.play();if(r&&r.catch)r.catch(()=>{});return;}
+  music.pause();music.src=src;music.loop=true;currentMusicKey=k;music.currentTime=0;
+  const r=music.play();if(r&&r.catch)r.catch(()=>{});
+}
+function playMenuMusic(force=false){playMusicKey('menu',force);}
+function playStageMusic(force=false){playMusicKey(audioKey(state.stageIndex),force);}
+function playCreditsMusic(force=false){playMusicKey('credits',force);}
+function pauseMusic(){music.pause();}
+function resumeMusic(){if(currentMusicKey&&music.src){const r=music.play();if(r&&r.catch)r.catch(()=>{});}}
+
+// Lightweight built-in SFX: subtle player shot click and a short rising spin sound.
+// Synthesized with WebAudio so the final HTML stays self-contained.
+let sfxCtx=null;
+function getSfxCtx(){try{if(!sfxCtx)sfxCtx=new (window.AudioContext||window.webkitAudioContext)();if(sfxCtx.state==='suspended')sfxCtx.resume();return sfxCtx}catch{return null}}
+function playShotSfx(){
+  const ac=getSfxCtx();if(!ac)return;const now=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
+  o.type='square';o.frequency.setValueAtTime(720,now);o.frequency.exponentialRampToValueAtTime(460,now+.035);
+  g.gain.setValueAtTime(.018,now);g.gain.exponentialRampToValueAtTime(.0001,now+.045);o.connect(g).connect(ac.destination);o.start(now);o.stop(now+.05);
+}
+function playSpinSfx(){
+  const ac=getSfxCtx();if(!ac)return;const now=ac.currentTime,o=ac.createOscillator(),g=ac.createGain(),lfo=ac.createOscillator(),lg=ac.createGain();
+  o.type='sawtooth';o.frequency.setValueAtTime(120,now);o.frequency.exponentialRampToValueAtTime(420,now+.55);
+  lfo.type='sine';lfo.frequency.value=13;lg.gain.value=24;lfo.connect(lg).connect(o.frequency);
+  g.gain.setValueAtTime(.0001,now);g.gain.exponentialRampToValueAtTime(.04,now+.04);g.gain.exponentialRampToValueAtTime(.0001,now+.62);
+  o.connect(g).connect(ac.destination);o.start(now);lfo.start(now);o.stop(now+.65);lfo.stop(now+.65);
+}
+['pointerdown','keydown'].forEach(ev=>window.addEventListener(ev,()=>{if(currentMusicKey&&music.paused)resumeMusic();},{passive:true}));
+
+function exportFinalGame(){
+  if(!BUILD.editor)return;
+  const customAssets={...USER_ASSETS,...savedAssets};
+  const customAudio={...USER_AUDIO,...savedAudio};
+  for(const k of ['menu','credits',...STAGES.map((_,i)=>audioKey(i))]){
+    const effective=audioSrcByKey(k);
+    if(effective)customAudio[k]=effective; else delete customAudio[k];
+  }
+  for(let i=1;i<=6;i++){
+    const k='credits'+i, effective=assetSrc(k);
+    if(savedAssets[k]||USER_ASSETS[k])customAssets[k]=effective;
+  }
+  const external=[];
+  for(const [k,v] of Object.entries(customAssets))if(v&&!String(v).startsWith('data:'))external.push('image:'+k);
+  for(const [k,v] of Object.entries(customAudio))if(v&&!String(v).startsWith('data:'))external.push('audio:'+k);
+  dialogues.forEach((stage,si)=>(stage||[]).forEach((line,li)=>{if(line&&line.portrait&&!String(line.portrait).startsWith('data:'))external.push(`dialogue:${si+1}.${li+1}`);}));
+  creditsImages.forEach((entry,i)=>{const v=creditImageSrc(entry);if(entry&&entry.src&&v&&!String(v).startsWith('data:'))external.push(`credits-image:${i+1}`);});
+  if(external.length&&!confirm('Есть внешние URL/пути: '+external.join(', ')+'.\nТакая сборка будет ссылаться на внешние файлы. Для полностью автономного HTML загрузи эти файлы через поля «Файл». Продолжить экспорт?'))return;
+  const payload={editor:false,assets:customAssets,audio:customAudio,dialogues:cloneJSON(dialogues),credits:cloneJSON(credits),creditsImages:cloneJSON(creditsImages),stageDurations:cloneJSON(stageDurations),spinText,stageComments:cloneJSON(stageComments)};
+  const safeJSON=JSON.stringify(payload).replace(/</g,'\\u003c');
+  let source='<!doctype html>\n'+document.documentElement.outerHTML;
+  const re=/const BUILD = \/\*__BUILD_CONFIG_START__\*\/[\s\S]*?\/\*__BUILD_CONFIG_END__\*\//;
+  source=source.replace(re,`const BUILD = /*__BUILD_CONFIG_START__*/ ${safeJSON} /*__BUILD_CONFIG_END__*/`);
+  const blob=new Blob([source],{type:'text/html;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='boroda_barrage_final.html';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);toast('Готовая игра экспортирована');
+}
+const state = {
+  mode:'menu', difficulty:'Normal', practice:false, stageIndex:0,
+  score:0, lives:4, bombs:3, graze:0, power:1, frame:0, stageFrame:0,
+  enemies:[], pBullets:[], eBullets:[], items:[], particles:[], boss:null,
+  player:{x:360,y:635,r:4,inv:0,shotCd:0,bombFx:0}, dialogIndex:0, transition:0,
+  scoreSaved:false, bgScroll:0, paused:false, stageSerial:0, creditsFrame:0, creditsIndex:0, creditsPrevIndex:0, creditsSlideTimer:0, creditsFade:1, stageCommentFrame:0
+};
+const DIFF = {
+  Immortal:{bullet:.72,fire:1.65,hp:.62,score:.5,immortal:true,label:'Immortal — бессмертие'},
+  Easy:{bullet:.86,fire:1.45,hp:.82,score:.8,label:'Easy'},
+  Normal:{bullet:1,fire:1.28,hp:1,score:1,label:'Normal'},
+  Hard:{bullet:1.14,fire:1.02,hp:1.12,score:1.3,label:'Hard'},
+  Lunatic:{bullet:1.30,fire:.84,hp:1.24,score:1.7,label:'Lunatic'}
+};
+
+window.addEventListener('keydown',e=>{
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+  if(!keys.has(e.code)) pressed.add(e.code); keys.add(e.code);
+  if(e.code==='Escape' && (state.mode==='playing'||state.mode==='dialog'||state.mode==='boss')) togglePause();
+});
+window.addEventListener('keyup',e=>keys.delete(e.code));
+window.addEventListener('blur',()=>{ if(state.mode==='playing'||state.mode==='boss'||state.mode==='dialog'){state.paused=true;pauseMusic();} });
+function advanceCreditsSlide(){
+  const n=Math.max(1,creditsImages.length);
+  state.creditsPrevIndex=state.creditsIndex;
+  state.creditsIndex=(state.creditsIndex+1)%n;
+  state.creditsSlideTimer=0;
+  state.creditsFade=0;
+}
+canvas.addEventListener('pointerdown',e=>{
+  if(state.mode!=='credits')return;
+  const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*(W/r.width),y=(e.clientY-r.top)*(H/r.height);
+  const bx=778,by=650,bw=190,bh=44;
+  if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh){finishRun(true);return;}
+  advanceCreditsSlide();
+});
+
+
+function show(html){ui.innerHTML=`<div class="panel">${html}</div>`; ui.style.display='flex';}
+function hideUI(){ui.innerHTML='';ui.style.display='none';}
+function buttonHandlers(map){for(const [sel,fn] of Object.entries(map)){const el=$(sel);if(el)el.onclick=fn;}}
+
+function mainMenu(){
+  state.mode='menu'; state.paused=false; playMenuMusic();
+  show(`<h1 class="title">${GAME_TITLE}</h1>${BUILD.editor?'<div class="sub">Однофайловый bullet-hell про Бороду: 4 уровня, ЮВА, более щадящие волны врагов, сюжетные диалоги, быстрые боссы, предметы, финальные титры, настраиваемая длина этапов и локальные рекорды.</div>':''}
+  <div class="menu">
+    <button class="primary" id="start">▶ Начать игру</button>
+    <button id="practice">✦ Практика уровней</button>
+    <button id="scores">★ Лучшие результаты</button>
+    ${BUILD.editor?'<button id="assets">▣ Ассеты, музыка и тексты</button>':''}
+    <button id="help">? Управление</button>
+  </div>${BUILD.editor?`<p class="tiny" style="margin-top:18px">${VERSION} · режим редактора · экспортирует готовую однофайловую игру · рекорды хранятся локально</p>`:''}`);
+  buttonHandlers({'#start':()=>{playMenuMusic();difficultyMenu(false)},'#practice':()=>{playMenuMusic();practiceMenu()},'#scores':()=>{playMenuMusic();scoresMenu()},'#assets':()=>{playMenuMusic();editorMenu()},'#help':()=>{playMenuMusic();helpMenu()}});
+}
+function difficultyMenu(practice=false,stage=0){
+  show(`<h2>${practice?'Практика':'Новая игра'}</h2><p class="muted">Выбери сложность. <b>Immortal</b> — суперлёгкий режим: игрок физически не может погибнуть, поэтому прохождение гарантировано, если продолжать играть до конца.</p>
+  <div class="menu">${Object.entries(DIFF).map(([name,d])=>`<button data-diff="${name}"><strong>${esc(d.label||name)}</strong> <span class="muted">×${d.score.toFixed(1)} score${d.immortal?' · жизни ∞':''}</span></button>`).join('')}<button id="back">← Назад</button></div>`);
+  document.querySelectorAll('[data-diff]').forEach(b=>b.onclick=()=>startGame(b.dataset.diff,practice,stage));
+  $('#back').onclick=practice?practiceMenu:mainMenu;
+}
+function practiceMenu(){
+  show(`<h2>Практика уровней</h2><p class="muted">Начать сразу с выбранного уровня. Практические результаты не попадают в таблицу полного прохождения.</p>
+  <div class="stageGrid">${STAGES.map((s,i)=>`<button class="stageCard" data-stage="${i}"><strong>${s.name}</strong><span>${esc(s.title)} · Boss: ${esc(s.boss)}</span></button>`).join('')}</div><div style="margin-top:12px"><button id="back">← Назад</button></div>`);
+  document.querySelectorAll('[data-stage]').forEach(b=>b.onclick=()=>difficultyMenu(true,+b.dataset.stage)); $('#back').onclick=mainMenu;
+}
+function helpMenu(){
+  show(`<h2>Управление</h2><div class="two"><div><h3>Клавиатура</h3><p><span class="kbd">↑↓←→</span> / <span class="kbd">WASD</span> — движение</p><p><span class="kbd">Shift</span> — фокус: медленнее + видимый хитбокс</p><p><span class="kbd">Z</span> / <span class="kbd">J</span> — стрельба / продолжить диалог</p><p><span class="kbd">X</span> / <span class="kbd">K</span> — раскрутка писюняги / спецприём</p><p><span class="kbd">Esc</span> — пауза</p></div><div><h3>Правила</h3><p class="muted">Уничтожай мелких врагов, собирай P для усиления, ♥ для дополнительной жизни и S для заряда спецприёма; пролетай близко к пулям ради graze. В конце каждого уровня — диалог и бой с боссом. Попадание отнимает жизнь и очищает экран. На сложности <b>Immortal</b> попадания не могут убить игрока.</p></div></div><button id="back">← Назад</button>`); $('#back').onclick=mainMenu;
+}
+function getScores(){return loadJSON(STORAGE.scores,[])}
+function scoresMenu(){
+  const scores=getScores();
+  const rows=scores.length?scores.slice(0,20).map((s,i)=>`<tr><td>${i+1}</td><td>${fmtScore(s.score)}</td><td>${esc(s.difficulty)}</td><td>${s.clear?'CLEAR':'Stage '+s.stage}</td><td>${new Date(s.date).toLocaleDateString()}</td></tr>`).join(''):`<tr><td colspan="5" class="muted">Пока нет записей. Заверши или проиграй полную попытку.</td></tr>`;
+  show(`<h2>Лучшие результаты</h2><table class="scoreTable"><thead><tr><th>#</th><th>Score</th><th>Difficulty</th><th>Result</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table><div class="row" style="margin-top:16px"><button id="back">← Назад</button><button class="danger" id="clear">Очистить рекорды</button></div>`);
+  $('#back').onclick=mainMenu; $('#clear').onclick=()=>{if(confirm('Удалить все рекорды?')){localStorage.removeItem(STORAGE.scores);scoresMenu();}};
+}
+function editorMenu(){
+  if(!BUILD.editor){mainMenu();return;}
+  const slots=['player','enemy1','enemy2','enemy3','enemy4','enemy5','bullet1','bullet2','bullet3','bullet4','bullet5','bullet6','spinStar','boss1','boss2','boss3','boss4','portraitPlayer','portraitBoss1','portraitBoss2','portraitBoss3','portraitBoss4','bg1','bg2','bg3','bg4','titleBg','credits1','credits2','credits3','credits4','credits5','credits6'];
+  show(`<h2>Ассеты, музыка и тексты</h2><p class="muted">Это уже собранная версия: меняй только нужные элементы и экспортируй финальный один HTML. <b>enemy4</b> — унылый баллун с присланной картинки. <b>enemy5</b> — крыса-кун; пока без нового рисунка, в игре используется системный 🐀-плейсхолдер, слот готов к замене. <b>spinStar</b> — настраиваемая звёздочка заряда спина. <b>bullet1…bullet6</b> — шесть видов вражеских снарядов. Ниже для них есть отдельная заметная секция загрузки, кроме общего списка слотов.</p>
+  <h3>Картинки</h3><div class="row"><label>Слот<select id="slot">${slots.map(s=>`<option>${s}</option>`).join('')}</select></label><label>Файл<input id="file" type="file" accept="image/*"></label></div>
+  <div id="preview" class="preview" style="margin-top:10px"></div>
+  <label style="display:block;margin-top:10px">Или URL / относительный путь<input id="url" placeholder="data:image/png;base64,... или ./image.png"></label>
+  <div class="row" style="margin-top:10px"><button id="saveUrl">Сохранить URL</button><button id="resetSlot">Сбросить слот</button></div>
+
+  <h3>Снаряды врагов</h3><p class="muted">Отдельная настройка внешнего вида пуль, которые выпускают мелкие враги и боссы. Можно заменить каждый из шести типов своей картинкой; изменения также попадут в финальный HTML.</p>
+  <div class="row"><label>Тип снаряда<select id="bulletSlot">${[1,2,3,4,5,6].map(i=>`<option value="bullet${i}">Снаряд ${i} — bullet${i}</option>`).join('')}</select></label><label>Файл<input id="bulletFile" type="file" accept="image/*"></label></div>
+  <div id="bulletPreview" class="preview" style="height:110px;margin-top:10px"></div>
+  <label style="display:block;margin-top:10px">Или URL / относительный путь<input id="bulletUrl" placeholder="data:image/png;base64,... или ./my-bullet.png"></label>
+  <div class="row" style="margin-top:10px"><button id="saveBulletUrl">Сохранить снаряд</button><button id="resetBullet">Сбросить снаряд</button></div>
+
+  <h3>Музыка меню, уровней и титров</h3><p class="muted">Все дорожки зациклены во время своего экрана. При экспорте финальной игры фактически выбранный трек меню, каждого уровня и титров запекается в BUILD.</p>
+  <div class="row"><label>Где играет<select id="musicStage"><option value="menu">Главное меню</option>${STAGES.map((s,i)=>`<option value="stage${i+1}">${s.name}: ${esc(s.title)}</option>`).join('')}<option value="credits">Финальные титры</option></select></label><label>Аудиофайл<input id="musicFile" type="file" accept="audio/*"></label></div>
+  <audio id="musicPreview" controls loop style="width:100%;margin-top:10px"></audio>
+  <label style="display:block;margin-top:10px">Или URL / относительный путь<input id="musicUrl" placeholder="data:audio/... или ./track.ogg"></label>
+  <div class="row" style="margin-top:10px"><button id="saveMusicUrl">Сохранить дорожку</button><button id="resetMusic">Убрать дорожку</button></div>
+  <p class="tiny">Если большой файл не помещается в localStorage, не перезагружай редактор и сразу экспортируй: текущий data URL всё равно попадёт в итоговый HTML.</p>
+
+  <h3>Спин: иконка и текст</h3><p class="muted">Отдельный ассет <b>spinStar</b> используется для выпадающего заряда, интерфейса и эффекта спина. Текст показывается в HUD и при активации.</p>
+  <div class="row"><label>Текст спина<input id="spinTextInput" maxlength="36"></label><label>Ассет-звёздочка<input id="spinStarFile" type="file" accept="image/*"></label></div>
+  <div id="spinStarPreview" class="preview" style="height:110px;margin-top:10px"></div>
+  <label style="display:block;margin-top:10px">URL / относительный путь звёздочки<input id="spinStarUrl" placeholder="data:image/png;base64,... или ./spin-star.png"></label>
+  <div class="row" style="margin-top:10px"><button id="saveSpinSettings">Сохранить спин</button><button id="resetSpinStar">Сбросить звёздочку</button></div>
+
+  <h3>Длительность уровня на мелких врагах</h3><p class="muted">Настраивается отдельно для каждого уровня. Значение — секунды от начала уровня до перехода к предбоссовому диалогу. После истечения времени оставшимся врагам даётся максимум ещё 3 секунды.</p>
+  <div class="stageGrid" id="stageDurationGrid">${STAGES.map((st,i)=>`<label class="stageCard"><strong>${st.name}</strong><span>${esc(st.title)}</span><input id="stageDur${i}" type="number" min="10" max="300" step="1" style="margin-top:8px" value="${getStageDuration(i)}"></label>`).join('')}</div>
+  <div class="row" style="margin-top:10px"><button id="saveStageDurations">Сохранить длительность</button><button id="resetStageDurations">Сбросить длительность</button></div>
+
+  <h3>Комментарий Бороды в начале уровня</h3><p class="muted">Короткая реплика появляется поверх игры в первые секунды уровня. Для каждого уровня текст хранится отдельно и запекается в финальный HTML.</p>
+  <div class="row"><label>Уровень<select id="stageCommentStage">${STAGES.map((s,i)=>`<option value="${i}">${s.name}: ${esc(s.title)}</option>`).join('')}</select></label></div>
+  <textarea id="stageCommentText" style="min-height:90px"></textarea><div class="row"><button id="saveStageComment">Сохранить комментарий</button><button id="resetStageComment">Сбросить комментарий</button></div>
+
+  <h3>Диалоги перед боссом</h3><div class="row"><label>Уровень<select id="dlgStage">${STAGES.map((s,i)=>`<option value="${i}">${s.name}: ${esc(s.boss)}</option>`).join('')}</select></label><div class="muted">Формат строки: <b>speaker | left/right | текст</b></div></div>
+  <textarea id="dlg"></textarea><div class="row"><button id="saveDlg">Сохранить диалог</button><button id="resetDlg">Сбросить диалог</button></div>
+
+  <h3>Картинка для каждой реплики</h3><div class="row"><label>Реплика<select id="dlgLine"></select></label><label>Файл картинки<input id="dlgPortraitFile" type="file" accept="image/*"></label></div>
+  <div id="dlgPortraitPreview" class="preview" style="margin-top:10px"></div>
+  <label style="display:block;margin-top:10px">Или URL / относительный путь<input id="dlgPortraitUrl" placeholder="data:image/png;base64,... или ./dialogue-face.png"></label>
+  <div class="row" style="margin-top:10px"><button id="saveDlgPortraitUrl">Сохранить картинку реплики</button><button id="resetDlgPortrait">Вернуть общий портрет</button></div>
+
+  <h3>Финальные титры — картинки без лимита</h3><p class="muted">Можно загрузить сколько угодно картинок. Они сохраняются списком и запекаются в финальный HTML. Во время титров клик по фону перелистывает картинки по кругу, а текст титров плавно проходит <b>снизу вверх</b> и повторяется с заметной паузой между проходами. Закончить игру можно только отдельной кнопкой.</p>
+  <div class="row"><label>Список картинок<select id="creditsImageList" size="6"></select></label><label>Добавить несколько файлов<input id="creditsImagesFile" type="file" accept="image/*" multiple></label></div>
+  <div id="creditsImagePreview" class="preview" style="height:150px;margin-top:10px"></div>
+  <label style="display:block;margin-top:10px">Добавить картинку по URL / пути<input id="creditsImageUrl" placeholder="data:image/png;base64,... или ./credit-photo.png"></label>
+  <div class="row" style="margin-top:10px"><button id="addCreditsImageUrl">+ Добавить URL</button><button id="creditsImageUp">↑ Выше</button><button id="creditsImageDown">↓ Ниже</button><button id="removeCreditsImage">Удалить выбранную</button><button id="resetCreditsImages">Вернуть 6 базовых</button></div>
+  <p class="tiny">Большое количество встроенных картинок сильно увеличивает размер итогового HTML. Если localStorage переполнится, добавленные файлы всё равно остаются в текущей сессии — сразу экспортируй игру, не перезагружая страницу.</p>
+  <h3>Текст титров</h3><textarea id="creditsText" style="min-height:120px"></textarea><div class="row"><button id="saveCredits">Сохранить титры</button><button id="resetCredits">Сбросить текст титров</button></div>
+
+  <h3>Готовая сборка</h3><p class="muted">Экспорт включает картинки, картинки реплик, музыку меню/уровней/титров, текст титров и все игровые изменения. В итоговой игре редактор исчезает.</p>
+  <button class="primary" id="exportFinal">⬇ Экспортировать готовую игру одним HTML</button>
+  <details style="margin-top:14px"><summary>Что сейчас настроено</summary><p class="muted">Игровой спрайт Бороды возвращён к самому первому стилизованному ассету и лишь немного увеличен. Красномордые враги убраны. Мелкие враги немного активнее и быстрее. Длительность обычной части каждого уровня теперь меняется прямо в редакторе. Боссы заметно усиливаются от первого к четвёртому: растут HP, скорость, частота и сложность паттернов. Титры прокручиваются сверху вниз, картинки можно перелистывать кликом, а завершение — только отдельной кнопкой.</p></details>
+  <div style="margin-top:16px"><button id="back">← Назад</button></div>`);
+
+  const slot=$('#slot'), preview=$('#preview'), url=$('#url');
+  const refresh=()=>{const src=assetSrc(slot.value);preview.style.backgroundImage=src?`url("${src.replace(/"/g,'%22')}")`:'none';url.value=savedAssets[slot.value]||USER_ASSETS[slot.value]||'';};
+  slot.onchange=refresh; refresh();
+  $('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{setAsset(slot.value,r.result);refresh();toast('Ассет загружен');};r.readAsDataURL(f);};
+  $('#saveUrl').onclick=()=>{if(!url.value.trim())resetAsset(slot.value);else setAsset(slot.value,url.value.trim());refresh();toast('URL сохранён');};
+  $('#resetSlot').onclick=()=>{resetAsset(slot.value);refresh();toast('Слот сброшен');};
+
+  const bsel=$('#bulletSlot'),bprev=$('#bulletPreview'),burl=$('#bulletUrl');
+  const refreshBullet=()=>{const k=bsel.value,src=assetSrc(k);bprev.style.backgroundImage=src?`url("${src.replace(/"/g,'%22')}")`:'none';burl.value=savedAssets[k]||USER_ASSETS[k]||'';};bsel.onchange=refreshBullet;refreshBullet();
+  $('#bulletFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{setAsset(bsel.value,r.result);refreshBullet();toast('Снаряд загружен');};r.readAsDataURL(f);};
+  $('#saveBulletUrl').onclick=()=>{const k=bsel.value,v=burl.value.trim();if(v)setAsset(k,v);else resetAsset(k);refreshBullet();toast('Снаряд сохранён');};
+  $('#resetBullet').onclick=()=>{resetAsset(bsel.value);refreshBullet();toast('Снаряд сброшен');};
+
+  const msel=$('#musicStage'), maudio=$('#musicPreview'), murl=$('#musicUrl');
+  const refreshMusic=()=>{const k=msel.value,src=audioSrcByKey(k);murl.value=savedAudio[k]||USER_AUDIO[k]||'';maudio.pause();if(src){maudio.src=src;maudio.load();}else{maudio.removeAttribute('src');maudio.load();}};
+  msel.onchange=refreshMusic;maudio.onplay=()=>pauseMusic();refreshMusic();
+  $('#musicFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const k=msel.value,r=new FileReader();r.onload=()=>{const ok=setAudioKey(k,r.result);refreshMusic();if(k==='menu')playMenuMusic(true);toast(ok?'Музыка сохранена':'Музыка сохранена в проекте');};r.readAsDataURL(f);};
+  $('#saveMusicUrl').onclick=()=>{const k=msel.value,v=murl.value.trim();if(!v)resetAudioKey(k);else setAudioKey(k,v);refreshMusic();if(k==='menu'&&v)playMenuMusic(true);toast('Дорожка сохранена');};
+  $('#resetMusic').onclick=()=>{const k=msel.value;resetAudioKey(k);refreshMusic();toast('Дорожка убрана');};
+
+  const spinInput=$('#spinTextInput'),spinPreview=$('#spinStarPreview'),spinUrl=$('#spinStarUrl');
+  const refreshSpin=()=>{const src=assetSrc('spinStar');spinInput.value=spinText;spinUrl.value=savedAssets.spinStar||USER_ASSETS.spinStar||'';spinPreview.style.backgroundImage=src?`url("${src.replace(/"/g,'%22')}")`:'none';};refreshSpin();
+  $('#spinStarFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{setAsset('spinStar',r.result);refreshSpin();toast('Звёздочка спина загружена');};r.readAsDataURL(f);};
+  $('#saveSpinSettings').onclick=()=>{saveSpinText(spinInput.value);const v=spinUrl.value.trim();if(v)setAsset('spinStar',v);refreshSpin();toast('Спин сохранён');};
+  $('#resetSpinStar').onclick=()=>{resetAsset('spinStar');refreshSpin();toast('Звёздочка спина сброшена');};
+
+  const dsel=$('#dlgStage'), ta=$('#dlg'), lsel=$('#dlgLine'), lp=$('#dlgPortraitPreview'), lpurl=$('#dlgPortraitUrl');
+  const refreshDlgPortrait=()=>{const i=+dsel.value,j=+lsel.value||0,line=getDialogue(i)[j];if(!line){lp.style.backgroundImage='none';lpurl.value='';return;}const src=dialoguePortraitSrc(i,line);lp.style.backgroundImage=`url("${src.replace(/"/g,'%22')}")`;lpurl.value=line.portrait||'';};
+  const reloadDlgLines=(keep=0)=>{const i=+dsel.value,d=getDialogue(i);lsel.innerHTML=d.map((x,j)=>`<option value="${j}">${j+1}. ${esc(x.speaker)} — ${esc((x.text||'').slice(0,52))}</option>`).join('');lsel.value=String(clamp(keep,0,Math.max(0,d.length-1)));refreshDlgPortrait();};
+  const loadDlg=()=>{ta.value=getDialogue(+dsel.value).map(x=>`${x.speaker} | ${x.side||'left'} | ${x.text}`).join('\n');reloadDlgLines(0);}; dsel.onchange=loadDlg;lsel.onchange=refreshDlgPortrait;loadDlg();
+  $('#saveDlg').onclick=()=>{const i=+dsel.value,old=getDialogue(i); const lines=ta.value.split('\n').map(s=>s.trim()).filter(Boolean); const parsed=lines.map((line,idx)=>{const p=line.split('|'),obj={speaker:(p.shift()||'???').trim(),side:((p.shift()||'left').trim()==='right'?'right':'left'),text:p.join('|').trim()};if(old[idx]&&old[idx].portrait)obj.portrait=old[idx].portrait;return obj;}).filter(x=>x.text); if(!parsed.length)return toast('Нужна хотя бы одна реплика'); dialogues[i]=parsed;const ok=persistJSON(STORAGE.dialog,dialogues);reloadDlgLines(+lsel.value||0);toast(ok?'Диалог сохранён':'Диалог сохранён в сессии — сразу экспортируй');};
+  $('#resetDlg').onclick=()=>{const i=+dsel.value;dialogues[i]=cloneJSON(DEFAULT_DIALOGUES[i]);persistJSON(STORAGE.dialog,dialogues);loadDlg();toast('Диалог сброшен');};
+  $('#dlgPortraitFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const i=+dsel.value,j=+lsel.value||0,r=new FileReader();r.onload=()=>{setDialoguePortrait(i,j,r.result);refreshDlgPortrait();toast('Картинка реплики сохранена');};r.readAsDataURL(f);};
+  $('#saveDlgPortraitUrl').onclick=()=>{setDialoguePortrait(+dsel.value,+lsel.value||0,lpurl.value.trim());refreshDlgPortrait();toast('Картинка реплики сохранена');};
+  $('#resetDlgPortrait').onclick=()=>{setDialoguePortrait(+dsel.value,+lsel.value||0,'');refreshDlgPortrait();toast('Вернут общий портрет');};
+
+  const refreshStageDurationInputs=()=>{STAGES.forEach((_,i)=>{const el=$('#stageDur'+i);if(el)el.value=String(getStageDuration(i));});};
+  $('#saveStageDurations').onclick=()=>{saveStageDurations(STAGES.map((_,i)=>$('#stageDur'+i).value));refreshStageDurationInputs();toast('Длительность уровней сохранена');};
+  $('#resetStageDurations').onclick=()=>{resetStageDurations();refreshStageDurationInputs();toast('Длительность уровней сброшена');};
+
+  const scs=$('#stageCommentStage'),sct=$('#stageCommentText');
+  const loadStageComment=()=>{sct.value=getStageComment(+scs.value);};scs.onchange=loadStageComment;loadStageComment();
+  $('#saveStageComment').onclick=()=>{saveStageComment(+scs.value,sct.value);loadStageComment();toast('Комментарий уровня сохранён');};
+  $('#resetStageComment').onclick=()=>{resetStageComment(+scs.value);loadStageComment();toast('Комментарий уровня сброшен');};
+
+  const ciSel=$('#creditsImageList'),ciPrev=$('#creditsImagePreview'),ciUrl=$('#creditsImageUrl');
+  const refreshCreditsImageList=(keep=0)=>{if(!creditsImages.length)creditsImages=cloneJSON(DEFAULT_CREDIT_IMAGE_ENTRIES);ciSel.innerHTML=creditsImages.map((e,i)=>`<option value="${i}">${esc(creditImageLabel(e,i))}</option>`).join('');const idx=clamp(Number(keep)||0,0,creditsImages.length-1);ciSel.value=String(idx);const src=creditImageSrc(creditsImages[idx]);ciPrev.style.backgroundImage=src?`url("${src.replace(/"/g,'%22')}")`:'none';};
+  ciSel.onchange=()=>refreshCreditsImageList(+ciSel.value||0);refreshCreditsImageList(0);
+  $('#creditsImagesFile').onchange=async e=>{const files=[...e.target.files];if(!files.length)return;const entries=await Promise.all(files.map(f=>new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve({src:r.result,name:f.name});r.onerror=()=>resolve(null);r.readAsDataURL(f);})));const good=entries.filter(Boolean);creditsImages.push(...good);const ok=saveCreditsImages();refreshCreditsImageList(Math.max(0,creditsImages.length-good.length));e.target.value='';toast(ok?`Добавлено картинок: ${good.length}`:`Добавлено ${good.length}; localStorage переполнен — сразу экспортируй`);};
+  $('#addCreditsImageUrl').onclick=()=>{const v=ciUrl.value.trim();if(!v)return toast('Укажи URL или путь');creditsImages.push({src:v,name:'URL / путь'});saveCreditsImages();ciUrl.value='';refreshCreditsImageList(creditsImages.length-1);toast('Картинка титров добавлена');};
+  $('#removeCreditsImage').onclick=()=>{if(creditsImages.length<=1)return toast('Нужна хотя бы одна картинка');const i=+ciSel.value||0;creditsImages.splice(i,1);saveCreditsImages();refreshCreditsImageList(Math.max(0,i-1));toast('Картинка удалена');};
+  $('#creditsImageUp').onclick=()=>{const i=+ciSel.value||0;if(i<=0)return;[creditsImages[i-1],creditsImages[i]]=[creditsImages[i],creditsImages[i-1]];saveCreditsImages();refreshCreditsImageList(i-1);};
+  $('#creditsImageDown').onclick=()=>{const i=+ciSel.value||0;if(i>=creditsImages.length-1)return;[creditsImages[i+1],creditsImages[i]]=[creditsImages[i],creditsImages[i+1]];saveCreditsImages();refreshCreditsImageList(i+1);};
+  $('#resetCreditsImages').onclick=()=>{resetCreditsImages();refreshCreditsImageList(0);toast('Вернуты 6 базовых картинок');};
+
+  const cta=$('#creditsText');cta.value=credits.join('\n');
+  $('#saveCredits').onclick=()=>{const lines=cta.value.split('\n').map(x=>x.replace(/\r/g,''));while(lines.length&&lines[0]==='')lines.shift();while(lines.length&&lines[lines.length-1]==='')lines.pop();saveCredits(lines);cta.value=credits.join('\n');toast('Титры сохранены');};
+  $('#resetCredits').onclick=()=>{credits=cloneJSON(DEFAULT_CREDITS);persistJSON(STORAGE.credits,credits);cta.value=credits.join('\n');toast('Титры сброшены');};
+  $('#exportFinal').onclick=exportFinalGame;
+  $('#back').onclick=()=>{maudio.pause();mainMenu();};
+}
+function resetRun(){
+  Object.assign(state,{score:0,lives:4,bombs:3,graze:0,power:1,frame:0,stageFrame:0,enemies:[],pBullets:[],eBullets:[],items:[],particles:[],boss:null,dialogIndex:0,transition:0,scoreSaved:false,paused:false,bgScroll:0,creditsFrame:0,creditsIndex:0,creditsPrevIndex:0,creditsSlideTimer:0,creditsFade:1,stageCommentFrame:0});
+  Object.assign(state.player,{x:360,y:635,inv:120,shotCd:0,bombFx:0});
+}
+function startGame(diff='Normal',practice=false,stage=0){
+  resetRun(); state.difficulty=diff;state.practice=practice;state.stageIndex=stage;state.mode='playing';hideUI();stageIntro();
+}
+
+function stageIntro(){state.stageSerial=(state.stageSerial||0)+1;state.stageFrame=0;state.enemies=[];state.eBullets=[];state.pBullets=[];state.items=[];state.boss=null;state.transition=160;state.stageCommentFrame=360;state.player.x=360;state.player.y=635;state.player.inv=100;playStageMusic(true);}
+function nextStage(){
+  if(state.practice){finishRun(true);return;}
+  if(state.stageIndex>=STAGES.length-1){startCredits();return;}
+  state.stageIndex++;state.mode='playing';stageIntro();
+}
+function startCredits(){state.mode='credits';state.creditsFrame=0;state.creditsIndex=0;state.creditsPrevIndex=0;state.creditsSlideTimer=0;state.creditsFade=1;state.enemies=[];state.eBullets=[];state.pBullets=[];state.items=[];state.boss=null;hideUI();playCreditsMusic(true);pressed.clear();}
+function updateCredits(){
+  state.creditsFrame++;
+  state.creditsSlideTimer++;
+  if(state.creditsFade<1)state.creditsFade=Math.min(1,state.creditsFade+1/72); // ~1.2 s at 60 fps
+  if(state.creditsSlideTimer>=480)advanceCreditsSlide(); // ~8 s per slide
+}
+
+function finishRun(clear=false){
+  state.mode=clear?'clear':'gameover';playMenuMusic(true);
+  if(!state.practice) saveScore(clear);
+  show(`<h1 class="title">${clear?'ALL CLEAR':'GAME OVER'}</h1><p class="sub">Score <b>${fmtScore(state.score)}</b> · Graze ${state.graze} · ${state.difficulty}${state.practice?' · Practice':''}</p><div class="menu"><button class="primary" id="retry">↻ Ещё раз</button><button id="scoresNow">★ Результаты</button><button id="menu">← Главное меню</button></div>`);
+  $('#retry').onclick=()=>startGame(state.difficulty,state.practice,state.practice?state.stageIndex:0); $('#scoresNow').onclick=scoresMenu; $('#menu').onclick=mainMenu;
+}
+function saveScore(clear){
+  if(state.scoreSaved)return;state.scoreSaved=true; let arr=getScores(); arr.push({score:Math.floor(state.score),difficulty:state.difficulty,stage:state.stageIndex+1,clear,date:Date.now()}); arr.sort((a,b)=>b.score-a.score);localStorage.setItem(STORAGE.scores,JSON.stringify(arr.slice(0,50)));
+}
+function togglePause(){state.paused=!state.paused;if(state.paused){pauseMusic();show(`<h2>Пауза</h2><div class="menu"><button class="primary" id="resume">Продолжить</button><button id="restart">Начать заново</button><button id="menu">В главное меню</button></div>`);$('#resume').onclick=()=>{state.paused=false;hideUI();resumeMusic()};$('#restart').onclick=()=>startGame(state.difficulty,state.practice,state.practice?state.stageIndex:0);$('#menu').onclick=mainMenu;}else{hideUI();resumeMusic();}}
+
+function spawnEnemy(x,y,type=0,pattern=0){
+  if(state.mode!=='playing')return;
+  const s=state.stageIndex,d=DIFF[state.difficulty],heavy=type===2,threat=[1,1.10,1.22,1.35][s]||1.35;
+  state.enemies.push({x,y,type,pattern,r:heavy?21:19,hp:(16+s*4.8)*(heavy?1.38:1)*d.hp,maxHp:1,vx:0,vy:(1.04+Math.min(type,2)*.17)*threat,age:0,fire:rand(52-s*3,86-s*4),phase:rand(0,Math.PI*2),dead:false});
+}
+function spawnWave(){
+  const t=state.stageFrame/60,s=state.stageIndex,serial=state.stageSerial,cycle=Math.floor(t/5)%6,bonus=s>=2?1:0;
+  const later=(fn,ms)=>setTimeout(()=>{if(state.mode==='playing'&&state.stageIndex===s&&state.stageSerial===serial)fn();},ms);
+  if(cycle===0){const n=4+bonus;for(let i=0;i<n;i++)later(()=>spawnEnemy(110+i*(500/Math.max(1,n-1)),-34,0,0),i*(150-s*8));}
+  else if(cycle===1){const n=4+(s>=3?1:0);for(let i=0;i<n;i++)later(()=>spawnEnemy(i%2?650:70,-28-i*10,1,1),i*(180-s*8));}
+  else if(cycle===2){const n=3+bonus;for(let i=0;i<n;i++)later(()=>spawnEnemy(120+i*(480/Math.max(1,n-1)),-36,2,2),i*(210-s*10));}
+  else if(cycle===3){const n=3+(s>=3?1:0);for(let i=0;i<n;i++)later(()=>spawnEnemy(120+i*(480/Math.max(1,n-1)),-36,3,3),i*(220-s*10));}
+  else if(cycle===4){const n=3+bonus;for(let i=0;i<n;i++)later(()=>spawnEnemy(120+i*(480/Math.max(1,n-1)),-36,4,4),i*(225-s*10));}
+  else {const n=4+bonus;for(let i=0;i<n;i++)later(()=>spawnEnemy(90+i*(540/Math.max(1,n-1)),-34,i%3,0),i*(160-s*8));}
+}
+function addEBullet(x,y,ang,speed,kind=0){
+  const d=DIFF[state.difficulty],radii=[4.2,4.6,5.0,4.0,5.2,4.4]; state.eBullets.push({x,y,vx:Math.cos(ang)*speed*d.bullet,vy:Math.sin(ang)*speed*d.bullet,r:radii[kind%radii.length],kind:kind%6,grazed:false,age:0});
+}
+function aimed(x,y,speed,offset=0){return Math.atan2(state.player.y-y,state.player.x-x)+offset;}
+function enemyFire(e){
+  const s=state.stageIndex,base=[1.64,1.76,1.90,2.05][s]||2.05;
+  if(e.pattern===0){
+    addEBullet(e.x,e.y,aimed(e.x,e.y,base),base,0);
+    if(s>=1)addEBullet(e.x,e.y,aimed(e.x,e.y,base,.10),base*.96,3);
+    if(s>=3)addEBullet(e.x,e.y,aimed(e.x,e.y,base,-.10),base*.96,5);
+  }else if(e.pattern===1){
+    const n=[6,7,8,9][s]||9;for(let i=0;i<n;i++)addEBullet(e.x,e.y,i*Math.PI*2/n+e.age*(.015+s*.002),base*.91,i%2?1:4);
+  }else if(e.pattern===2){
+    const spread=[1.5,1.5,2,2][s];for(let i=-spread;i<=spread;i++)addEBullet(e.x,e.y,Math.PI/2+i*(.18-s*.008),base*1.04,(Math.round(i+spread))%2?2:3);
+  }else if(e.pattern===3){
+    const fan=s>=2?2:1;for(let i=-fan;i<=fan;i++)addEBullet(e.x,e.y,aimed(e.x,e.y,base,i*.12),base*.99,i===0?5:1);
+  }else if(e.pattern===4){
+    const fan=2+(s>=2?1:0);for(let i=-fan;i<=fan;i++)addEBullet(e.x,e.y,aimed(e.x,e.y,base,i*.072),base*1.08,i%2?4:2);
+  }
+}
+function updateEnemies(){
+  const d=DIFF[state.difficulty],s=state.stageIndex,interval=[80,72,64,57][s]||57;
+  for(const e of state.enemies){
+    e.age++;e.y+=e.vy;if(e.pattern===1)e.x+=Math.sin(e.age*(.025+s*.002)+e.phase)*(1.05+s*.08);if(e.pattern===4)e.x+=Math.sin(e.age*(.018+s*.0015)+e.phase)*(.75+s*.08);
+    e.fire--;if(e.fire<=0&&e.y>35&&e.y<500){enemyFire(e);e.fire=Math.max(58,interval*d.fire+rand(8,22));}
+    if(e.y>760)e.dead=true;
+  }
+  state.enemies=state.enemies.filter(e=>!e.dead);
+}
+function playerShoot(){
+  const p=state.player; if(p.shotCd>0)return; p.shotCd=keys.has('ShiftLeft')||keys.has('ShiftRight')?5:4;playShotSfx();
+  const lvl=Math.floor(state.power);
+  state.pBullets.push({x:p.x-7,y:p.y-18,vx:0,vy:-11,r:3,damage:5},{x:p.x+7,y:p.y-18,vx:0,vy:-11,r:3,damage:5});
+  if(lvl>=2) state.pBullets.push({x:p.x-15,y:p.y-8,vx:-.7,vy:-10,r:3,damage:4},{x:p.x+15,y:p.y-8,vx:.7,vy:-10,r:3,damage:4});
+  if(lvl>=3) state.pBullets.push({x:p.x-23,y:p.y,vx:-1.2,vy:-9.5,r:3,damage:3},{x:p.x+23,y:p.y,vx:1.2,vy:-9.5,r:3,damage:3});
+  if(lvl>=4) state.pBullets.push({x:p.x,y:p.y-30,vx:0,vy:-13,r:4,damage:7});
+}
+function useBomb(){
+  if(state.bombs<=0||state.player.bombFx>0)return;
+  playSpinSfx();state.bombs--;state.player.bombFx=105;state.player.inv=170;state.eBullets=[];
+  for(const e of state.enemies)e.hp-=45;
+  if(state.boss)state.boss.hp-=state.boss.maxHp*.11;
+  state.score+=1000;burst(state.player.x,state.player.y,52);
+}
+function updatePlayer(){
+  const p=state.player, focus=keys.has('ShiftLeft')||keys.has('ShiftRight'), speed=focus?2.25:4.5;
+  let dx=(keys.has('ArrowRight')||keys.has('KeyD')?1:0)-(keys.has('ArrowLeft')||keys.has('KeyA')?1:0),dy=(keys.has('ArrowDown')||keys.has('KeyS')?1:0)-(keys.has('ArrowUp')||keys.has('KeyW')?1:0); if(dx&&dy){dx*=.707;dy*=.707;}p.x=clamp(p.x+dx*speed,18,FIELD_W-18);p.y=clamp(p.y+dy*speed,18,H-18);
+  if(p.inv>0)p.inv--;if(p.shotCd>0)p.shotCd--;if(p.bombFx>0)p.bombFx--; if(keys.has('KeyZ')||keys.has('KeyJ'))playerShoot(); if(pressed.has('KeyX')||pressed.has('KeyK'))useBomb();
+}
+function hitPlayer(){
+  const p=state.player;if(p.inv>0)return;
+  if(DIFF[state.difficulty].immortal){p.inv=90;state.eBullets=[];burst(p.x,p.y,22);return;}
+  p.inv=150;state.lives--;state.bombs=Math.max(state.bombs,2);state.power=Math.max(1,state.power-.5);state.eBullets=[];burst(p.x,p.y,36);p.x=360;p.y=650;if(state.lives<0)finishRun(false);
+}
+function burst(x,y,n=12){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,sp=rand(.5,4);state.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rand(18,50),max:50,r:rand(1,4)});}}
+function updateBullets(){
+  for(const b of state.pBullets){b.x+=b.vx;b.y+=b.vy;}state.pBullets=state.pBullets.filter(b=>b.y>-30&&b.x>-30&&b.x<FIELD_W+30);
+  for(const b of state.eBullets){b.x+=b.vx;b.y+=b.vy;b.age++;const dd=dist2(b.x,b.y,state.player.x,state.player.y);if(dd<(b.r+state.player.r)*(b.r+state.player.r)){b.dead=true;hitPlayer();}else if(!b.grazed&&dd<22*22){b.grazed=true;state.graze++;state.score+=25*DIFF[state.difficulty].score;}}
+  state.eBullets=state.eBullets.filter(b=>!b.dead&&b.x>-40&&b.x<FIELD_W+40&&b.y>-50&&b.y<H+50);
+  for(const pb of state.pBullets){
+    for(const e of state.enemies){
+      if(!e.dead&&dist2(pb.x,pb.y,e.x,e.y)<(pb.r+e.r)*(pb.r+e.r)){
+        e.hp-=pb.damage;pb.dead=true;
+        if(e.hp<=0){
+          e.dead=true;state.score+=(120+e.type*50)*(state.stageIndex+1)*DIFF[state.difficulty].score;burst(e.x,e.y,10);
+          const roll=Math.random();
+          if(roll<.38)state.items.push({x:e.x,y:e.y,vy:1.55,type:'power'});
+          else if(roll<.48)state.items.push({x:e.x,y:e.y,vy:1.45,type:'spin'});
+          else if(roll<.55)state.items.push({x:e.x,y:e.y,vy:1.35,type:'heal'});
+        }
+        break;
+      }
+    }
+    const b=state.boss;if(!pb.dead&&b&&dist2(pb.x,pb.y,b.x,b.y)<(pb.r+b.r)*(pb.r+b.r)){b.hp-=pb.damage;pb.dead=true;state.score+=2*DIFF[state.difficulty].score;}
+  }
+  state.pBullets=state.pBullets.filter(b=>!b.dead);state.enemies=state.enemies.filter(e=>!e.dead);
+}
+function updateItems(){
+  for(const it of state.items){
+    it.y+=it.vy;
+    if(dist2(it.x,it.y,state.player.x,state.player.y)<25*25){
+      it.dead=true;
+      if(it.type==='heal'){
+        if(DIFF[state.difficulty].immortal)state.score+=500;else state.lives=Math.min(6,state.lives+1);
+      }else if(it.type==='spin')state.bombs=Math.min(6,state.bombs+1);
+      else state.power=Math.min(4,state.power+.20);
+      state.score+=80;
+    }
+  }
+  state.items=state.items.filter(i=>!i.dead&&i.y<750);
+}
+function updateParticles(){for(const p of state.particles){p.x+=p.vx;p.y+=p.vy;p.vx*=.98;p.vy*=.98;p.life--;}state.particles=state.particles.filter(p=>p.life>0);}
+
+function beginDialog(){state.mode='dialog';state.dialogIndex=0;state.eBullets=[];state.enemies=[];state.pBullets=[];pressed.clear();}
+function updateDialog(){if(pressed.has('KeyZ')||pressed.has('KeyJ')||pressed.has('Enter')||pressed.has('Space')){state.dialogIndex++;if(state.dialogIndex>=getDialogue(state.stageIndex).length)startBoss();}}
+function startBoss(){
+  const s=state.stageIndex,d=DIFF[state.difficulty],baseHp=[1080,1460,1940,2520][s]||2520,hp=baseHp*d.hp;
+  const phases=[2,2,3,3][s]||3;
+  state.mode='boss';state.eBullets=[];state.boss={x:360,y:140,targetX:360,targetY:140,r:31,hp,maxHp:hp,phase:0,maxPhase:phases,age:0,fire:58,move:0,volley:0,spellTimer:60*(43+s*2)};state.player.inv=90;
+}
+function bossPhaseReset(){
+  const b=state.boss,s=state.stageIndex,d=DIFF[state.difficulty];b.phase++;
+  if(b.phase>=b.maxPhase){state.score+=22000*(s+1)*DIFF[state.difficulty].score;state.boss=null;state.eBullets=[];state.transition=150;state.mode='stageclear';return;}
+  const base=[1160,1570,2070,2650][s]||2650,phaseGain=[150,180,220,270][s]||270;
+  b.maxHp=(base+b.phase*phaseGain)*d.hp;b.hp=b.maxHp;b.age=0;b.fire=Math.max(34,54-s*5);b.volley=0;b.spellTimer=60*(42+s*2-b.phase);state.eBullets=[];state.score+=6000*(s+1);burst(b.x,b.y,48);
+  state.items.push({x:b.x-25,y:b.y+20,vy:1.1,type:'power'},{x:b.x+25,y:b.y+20,vy:1.1,type:b.phase%2?'spin':'heal'});
+}
+function bossFire(b){
+  const s=state.stageIndex,p=b.phase,n=8+s*2+p,sp=2.35+s*.23+p*.13;b.volley=(b.volley||0)+1;
+  const modeCount=s===0?2:(s===1?3:4),mode=(b.volley+p)%modeCount;
+  if(mode===0){
+    for(let i=0;i<n;i++)addEBullet(b.x,b.y,b.age*(.020+s*.003)+i*Math.PI*2/n,sp,(i+s)%6);
+    if(s>=1&&b.volley%2===0)for(let i=0;i<n;i+=2)addEBullet(b.x,b.y,-b.age*.016+(i+.5)*Math.PI*2/n,sp*.78,3);
+  }else if(mode===1){
+    const fan=2+p+s;for(let j=-fan;j<=fan;j++)addEBullet(b.x,b.y,aimed(b.x,b.y,sp,j*(.13-s*.008)),sp*(1.02+s*.025),j%3===0?5:(j%2?2:0));
+  }else if(mode===2){
+    for(let i=0;i<n;i++){addEBullet(b.x,b.y,i*Math.PI*2/n+b.age*.018,sp*.88,4);addEBullet(b.x,b.y,(i+.5)*Math.PI*2/n-b.age*.021,sp*1.10,1);}
+  }else{
+    for(let i=0;i<8+s;i++){const a=i*Math.PI*2/(8+s)+b.age*.024;addEBullet(b.x+Math.cos(a)*42,b.y+Math.sin(a)*22,a+Math.PI/2,sp,3+i%3);}
+    for(let j=-2-p;j<=2+p;j++)addEBullet(b.x,b.y,aimed(b.x,b.y,sp,j*.135),sp*1.16,j%2?5:2);
+  }
+  if(s>=2&&b.volley%4===0){for(let i=0;i<6+s;i++)addEBullet(65+i*(590/(5+s)),55,Math.PI/2+(i%2?.09:-.09),sp*.90,(i+3)%6);}
+  if(s>=3&&b.volley%3===0){for(let y=105;y<=265;y+=80){addEBullet(22,y,.13,sp*.92,4);addEBullet(FIELD_W-22,y,Math.PI-.13,sp*.92,5);}}
+}
+function updateBoss(){
+  const b=state.boss;if(!b)return;b.age++;b.spellTimer--;b.move--;
+  if(b.move<=0){b.targetX=rand(145,575);b.targetY=rand(85,220);b.move=rand(Math.max(72,118-state.stageIndex*12),Math.max(110,165-state.stageIndex*8));}b.x=lerp(b.x,b.targetX,.016+state.stageIndex*.0015);b.y=lerp(b.y,b.targetY,.016+state.stageIndex*.0015);
+  b.fire--;if(b.fire<=0){bossFire(b);const base=[58,50,43,37][state.stageIndex]||37;b.fire=Math.max(26,(base-b.phase*2)*DIFF[state.difficulty].fire);}
+  if(b.hp<=0||b.spellTimer<=0)bossPhaseReset();
+}
+function updateGame(){
+  if(state.paused)return;state.frame++;state.bgScroll+=.25;if(state.transition>0&&state.mode!=='stageclear')state.transition--;updateParticles();
+  if(state.mode==='credits'){updateCredits();return;}
+  if(state.mode==='dialog'){updateDialog();return;}
+  if(state.mode==='stageclear'){state.transition--;if(state.transition<=0)nextStage();return;}
+  if(state.mode!=='playing'&&state.mode!=='boss')return;
+  updatePlayer();updateBullets();updateItems();
+  if(state.mode==='playing'){
+    if(state.stageCommentFrame>0)state.stageCommentFrame--;
+    state.stageFrame++;const t=state.stageFrame/60,dur=getStageDuration(state.stageIndex);
+    const waveEvery=[300,285,270,255][state.stageIndex]||255;if(t<dur&&state.stageFrame%waveEvery===30)spawnWave();
+    updateEnemies();
+    if(t>=dur&&(state.enemies.length===0||t>=dur+3)){state.enemies=[];beginDialog();}
+  }else updateBoss();
+}
+function drawImageContain(im,x,y,w,h,alpha=1){if(!im||!im.complete||!im.naturalWidth)return;ctx.save();ctx.globalAlpha=alpha;const r=Math.min(w/im.naturalWidth,h/im.naturalHeight),dw=im.naturalWidth*r,dh=im.naturalHeight*r;ctx.drawImage(im,x+(w-dw)/2,y+(h-dh)/2,dw,dh);ctx.restore();}
+function drawBg(){
+  const slot=(state.mode==='menu'||state.mode==='gameover'||state.mode==='clear')?'titleBg':STAGES[state.stageIndex]?.bg||'titleBg', im=img(slot);ctx.fillStyle='#080910';ctx.fillRect(0,0,W,H);if(im.complete&&im.naturalWidth){ctx.save();ctx.globalAlpha=.82;ctx.drawImage(im,0,0,FIELD_W,H);ctx.restore();}
+  ctx.fillStyle='#0b0d17';ctx.fillRect(SIDE_X,0,W-SIDE_X,H);ctx.strokeStyle='#ffffff18';ctx.beginPath();ctx.moveTo(SIDE_X+.5,0);ctx.lineTo(SIDE_X+.5,H);ctx.stroke();
+}
+function drawPlayfieldFX(){ctx.save();ctx.beginPath();ctx.rect(0,0,FIELD_W,H);ctx.clip();ctx.globalAlpha=.10;ctx.strokeStyle='#fff';for(let y=((state.bgScroll*2)%80)-80;y<H;y+=80){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(FIELD_W,y);ctx.stroke();}ctx.restore();}
+function drawEntities(){
+  for(const it of state.items){
+    ctx.save();ctx.translate(it.x,it.y);ctx.rotate(state.frame*.035);ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.textAlign='center';
+    if(it.type==='heal'){ctx.fillStyle='#36dc70';ctx.font='bold 22px sans-serif';ctx.fillText('♥',0,7);}
+    else if(it.type==='spin'){ctx.restore();drawImageContain(img('spinStar'),it.x-14,it.y-14,28,28,1);ctx.save();ctx.translate(it.x,it.y);}
+    else{ctx.fillStyle='#ff3b62';ctx.fillRect(-9,-9,18,18);ctx.strokeRect(-9,-9,18,18);ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText('P',0,4);}
+    ctx.restore();
+  }
+  for(const e of state.enemies){
+    const sz=e.type===3?76:72;
+    if(e.type===4&&!assetSrc('enemy5')){
+      ctx.save();ctx.font='48px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('🐀',e.x,e.y);ctx.fillStyle='#fff';ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.fillRect(e.x+16,e.y+7,16,20);ctx.strokeRect(e.x+16,e.y+7,16,20);ctx.fillStyle='#333';ctx.font='10px sans-serif';ctx.fillText('!',e.x+24,e.y+19);ctx.restore();
+    }else drawImageContain(img('enemy'+(e.type+1)),e.x-sz/2,e.y-sz/2,sz,sz,1);
+  }
+  if(state.boss){ctx.save();ctx.shadowBlur=30;ctx.shadowColor='#ff375f';drawImageContain(img(STAGES[state.stageIndex].bossSlot),state.boss.x-57,state.boss.y-69,114,138,1);ctx.restore();}
+  ctx.save();ctx.fillStyle='#fff58b';ctx.shadowBlur=8;ctx.shadowColor='#fff';for(const b of state.pBullets){ctx.beginPath();ctx.ellipse(b.x,b.y,2.2,7,0,0,Math.PI*2);ctx.fill();}ctx.restore();
+  for(const b of state.eBullets){
+    const dims=[[15,15],[17,17],[16,18],[12,22],[17,20],[19,19]][b.kind]||[16,16],w=dims[0],h=dims[1];
+    ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.age*(.045+b.kind*.007));drawImageContain(img('bullet'+(b.kind+1)),-w/2,-h/2,w,h,1);ctx.restore();
+  }
+  const p=state.player;if(p.inv<=0||Math.floor(p.inv/6)%2===0)drawImageContain(img('player'),p.x-31,p.y-38,62,76,1);
+  if(keys.has('ShiftLeft')||keys.has('ShiftRight')){ctx.save();ctx.strokeStyle='#fff';ctx.fillStyle='#ff234f';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,p.r+3,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();}
+  if(p.bombFx>0){
+    const k=(105-p.bombFx)*.19,radius=34+(105-p.bombFx)*2.2;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(k);ctx.globalAlpha=.72;ctx.strokeStyle='#ffd65a';ctx.lineWidth=6;
+    for(let i=0;i<4;i++){ctx.rotate(Math.PI/2);ctx.beginPath();ctx.arc(0,0,32+(105-p.bombFx)*2.6,-.55,.55);ctx.stroke();}
+    ctx.globalAlpha=.28;ctx.strokeStyle='#fff';ctx.lineWidth=9;ctx.beginPath();ctx.arc(0,0,(105-p.bombFx)*5.3,0,Math.PI*2);ctx.stroke();ctx.restore();
+    for(let i=0;i<4;i++){const a=k+i*Math.PI/2,x=p.x+Math.cos(a)*radius,y=p.y+Math.sin(a)*radius;drawImageContain(img('spinStar'),x-12,y-12,24,24,.9);}
+    ctx.save();ctx.globalAlpha=clamp(p.bombFx/30,0,1);ctx.textAlign='center';ctx.fillStyle='#fff2a8';ctx.strokeStyle='#5d3500';ctx.lineWidth=4;ctx.font='900 19px system-ui';ctx.strokeText(spinText,p.x,p.y-55);ctx.fillText(spinText,p.x,p.y-55);ctx.restore();
+  }
+  for(const q of state.particles){ctx.globalAlpha=clamp(q.life/q.max,0,1);ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;
+}
+function drawSidebar(){
+  const s=STAGES[state.stageIndex]||STAGES[0];ctx.save();ctx.fillStyle='#f4f3ff';ctx.font='700 16px system-ui';ctx.fillText('HIGH SCORE',754,63);const hs=getScores()[0]?.score||0;ctx.textAlign='right';ctx.font='700 26px ui-monospace,monospace';ctx.fillText(fmtScore(hs),970,92);ctx.textAlign='left';ctx.font='700 16px system-ui';ctx.fillText('SCORE',754,130);ctx.textAlign='right';ctx.font='700 26px ui-monospace,monospace';ctx.fillText(fmtScore(state.score),970,160);ctx.textAlign='left';
+  const label=(y,t,c='#cfd4ea')=>{ctx.fillStyle=c;ctx.font='700 16px system-ui';ctx.fillText(t,754,y)};label(215,'ДС','#ff6a86');ctx.font='20px serif';ctx.fillText(DIFF[state.difficulty]?.immortal?'∞':'★'.repeat(Math.max(0,state.lives)),830,216);label(250,spinText.slice(0,11).toUpperCase(),'#ffd45c');drawImageContain(img('spinStar'),866,230,25,25,1);ctx.fillStyle='#fff';ctx.font='700 17px system-ui';ctx.fillText('×'+Math.max(0,state.bombs),898,250);label(303,'POWER','#ff6a86');ctx.fillStyle='#fff';ctx.fillText(state.power>=3.98?'MAX':state.power.toFixed(2),850,303);label(336,'GRAZE','#67e79a');ctx.fillStyle='#fff';ctx.fillText(String(state.graze),850,336);
+  ctx.fillStyle='#ffffff18';ctx.fillRect(754,372,216,1);ctx.fillStyle='#8f98b9';ctx.font='13px system-ui';ctx.fillText(s.name.toUpperCase(),754,410);ctx.fillStyle='#fff';ctx.font='800 22px system-ui';wrapText(s.title,754,438,210,26);ctx.fillStyle='#9ca6c5';ctx.font='13px system-ui';ctx.fillText(`Difficulty: ${state.difficulty}`,754,512);ctx.fillText(state.practice?'Practice mode':'Full run',754,534);
+  if(state.boss){ctx.fillStyle='#ff6480';ctx.font='700 13px system-ui';ctx.fillText(`BOSS — ${s.boss}`,754,584);ctx.fillStyle='#ffffff1b';ctx.fillRect(754,598,216,10);ctx.fillStyle='#ff365c';ctx.fillRect(754,598,216*clamp(state.boss.hp/state.boss.maxHp,0,1),10);ctx.fillStyle='#9da6c4';ctx.font='12px system-ui';ctx.fillText(`Phase ${state.boss.phase+1}/${state.boss.maxPhase}   ${Math.ceil(state.boss.spellTimer/60)}s`,754,630);}
+  ctx.fillStyle='#69718d';ctx.font='12px system-ui';ctx.fillText('Z/J shoot · X/K spin · Shift focus',754,683);ctx.restore();
+}
+function wrapText(text,x,y,maxWidth,lineHeight){let words=text.split(' '),line='';for(let n=0;n<words.length;n++){let test=line+words[n]+' ';if(ctx.measureText(test).width>maxWidth&&n>0){ctx.fillText(line,x,y);line=words[n]+' ';y+=lineHeight;}else line=test;}ctx.fillText(line,x,y);}
+function drawBossBar(){if(!state.boss)return;ctx.save();ctx.fillStyle='#0009';ctx.fillRect(25,18,FIELD_W-50,18);ctx.fillStyle='#ff3b62';ctx.fillRect(29,22,(FIELD_W-58)*clamp(state.boss.hp/state.boss.maxHp,0,1),10);ctx.fillStyle='#fff';ctx.font='700 13px system-ui';ctx.fillText(STAGES[state.stageIndex].boss,30,52);ctx.restore();}
+function drawTransition(){if(state.transition<=0)return;const s=STAGES[state.stageIndex],a=clamp(state.transition<35?state.transition/35:(160-state.transition)/28,0,1);ctx.save();ctx.globalAlpha=a;ctx.fillStyle='#000a';ctx.fillRect(0,245,FIELD_W,165);ctx.fillStyle='#ff6a86';ctx.font='700 18px system-ui';ctx.textAlign='center';ctx.fillText(s.name.toUpperCase(),FIELD_W/2,300);ctx.fillStyle='#fff';ctx.font='900 38px system-ui';ctx.fillText(s.title,FIELD_W/2,346);ctx.fillStyle='#a8b0cd';ctx.font='14px system-ui';ctx.fillText(`Boss: ${s.boss}`,FIELD_W/2,380);ctx.restore();}
+function drawStageComment(){
+  if(state.mode!=='playing'||state.stageCommentFrame<=0)return;
+  const text=getStageComment(state.stageIndex);if(!text)return;
+  const elapsed=360-state.stageCommentFrame;if(elapsed<70)return;
+  const a=clamp(Math.min((elapsed-70)/22,state.stageCommentFrame/35),0,1);if(a<=0)return;
+  ctx.save();ctx.globalAlpha=a;drawImageContain(img('portraitPlayer'),26,72,100,132,.95);
+  ctx.fillStyle='#070913e8';ctx.strokeStyle='#ffffff32';ctx.lineWidth=2;roundRect(ctx,112,87,530,104,12,true,true);
+  ctx.fillStyle='#ff7892';ctx.font='800 17px system-ui';ctx.fillText('Борода',134,116);ctx.fillStyle='#fff';ctx.font='16px system-ui';wrapText(text,134,143,484,22);ctx.restore();
+}
+function drawDialog(){
+  const d=getDialogue(state.stageIndex),line=d[Math.min(state.dialogIndex,d.length-1)],s=STAGES[state.stageIndex];if(!line)return;
+  const activePortrait=dialoguePortraitSrc(state.stageIndex,line),leftSrc=line.side==='left'?activePortrait:assetSrc('portraitPlayer'),rightSrc=line.side==='right'?activePortrait:assetSrc(s.portrait);
+  ctx.save();ctx.fillStyle='#0006';ctx.fillRect(0,0,FIELD_W,H);drawImageContain(imgFromSrc(leftSrc),-18,195,330,500,line.side==='left'?1:.28);drawImageContain(imgFromSrc(rightSrc),405,195,330,500,line.side==='right'?1:.28);ctx.fillStyle='#080913e8';ctx.strokeStyle='#ffffff38';ctx.lineWidth=2;roundRect(ctx,68,520,584,142,12,true,true);ctx.fillStyle=line.side==='left'?'#ff6685':'#b79cff';ctx.font='800 20px system-ui';ctx.fillText(line.speaker,92,553);ctx.fillStyle='#fff';ctx.font='18px system-ui';wrapText(line.text,92,585,530,25);ctx.fillStyle='#919ab9';ctx.font='12px system-ui';ctx.textAlign='right';ctx.fillText('Z / Enter ▶',625,641);ctx.restore();
+}
+function roundRect(c,x,y,w,h,r,fill,stroke){if(w<2*r)r=w/2;if(h<2*r)r=h/2;c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();if(fill)c.fill();if(stroke)c.stroke();}
+function drawCredits(){
+  const list=creditsImages.length?creditsImages:DEFAULT_CREDIT_IMAGE_ENTRIES,n=Math.max(1,list.length),idx=((state.creditsIndex%n)+n)%n,prev=((state.creditsPrevIndex%n)+n)%n;
+  ctx.fillStyle='#05070b';ctx.fillRect(0,0,W,H);
+  const drawCreditBg=(entry,alpha)=>{const src=creditImageSrc(entry),im=imgFromSrc(src||assetSrc('titleBg'));if(im.complete&&im.naturalWidth&&alpha>0){ctx.save();ctx.globalAlpha=.72*alpha;const r=Math.max(W/im.naturalWidth,H/im.naturalHeight),dw=im.naturalWidth*r,dh=im.naturalHeight*r;ctx.drawImage(im,(W-dw)/2,(H-dh)/2,dw,dh);ctx.restore();}};
+  const f=clamp(state.creditsFade,0,1);
+  if(prev!==idx&&f<1)drawCreditBg(list[prev],1-f);
+  drawCreditBg(list[idx],prev===idx?1:f);
+  ctx.fillStyle='rgba(0,0,0,.34)';ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.textAlign='center';ctx.shadowColor='#000';ctx.shadowBlur=12;ctx.fillStyle='#fff';ctx.font='900 42px system-ui';ctx.fillText('BORODA BARRAGE',W/2,60);
+  ctx.font='14px system-ui';ctx.fillStyle='#d9ddec';ctx.fillText(`Слайды меняются автоматически · клик — следующая · ${idx+1}/${n}`,W/2,90);
+  // Credits text moves from below the screen upward. The extra travel distance creates a visible pause before the next loop.
+  const gap=58,total=Math.max(gap,credits.length*gap),pauseGap=520,travel=H+total+pauseGap,offset=(state.creditsFrame*.50)%travel,start=H+90-offset;
+  ctx.font='700 24px system-ui';ctx.fillStyle='#fff';credits.forEach((line,i)=>{const y=start+i*gap;if(y>-60&&y<H+70)ctx.fillText(line,W/2,y);});
+  const bx=778,by=650,bw=190,bh=44;ctx.fillStyle='rgba(10,12,20,.9)';ctx.strokeStyle='#ffffff66';ctx.lineWidth=2;roundRect(ctx,bx,by,bw,bh,10,true,true);ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='800 15px system-ui';ctx.fillText('ЗАКОНЧИТЬ ИГРУ',bx+bw/2,by+28);ctx.restore();
+}
+function render(){
+  if(state.mode==='credits'){drawCredits();return;}
+  drawBg();drawPlayfieldFX();if(state.mode!=='menu'){drawEntities();drawBossBar();drawSidebar();drawTransition();drawStageComment();if(state.mode==='dialog')drawDialog();if(state.mode==='stageclear'){ctx.save();ctx.fillStyle='#0008';ctx.fillRect(0,0,FIELD_W,H);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='900 48px system-ui';ctx.fillText('STAGE CLEAR',FIELD_W/2,330);ctx.fillStyle='#ff7891';ctx.font='18px system-ui';ctx.fillText(`Score ${fmtScore(state.score)}`,FIELD_W/2,365);ctx.restore();}}
+  else{ctx.save();ctx.fillStyle='#0005';ctx.fillRect(0,0,FIELD_W,H);ctx.fillStyle='#ffffff16';for(let i=0;i<55;i++){const x=(i*137+state.frame*.8)%FIELD_W,y=(i*83+Math.sin(i)*90)%H;ctx.beginPath();ctx.arc(x,y,2+(i%4),0,Math.PI*2);ctx.fill();}ctx.restore();}
+}
+function loop(){updateGame();render();pressed.clear();requestAnimationFrame(loop)}
+
+mainMenu();
+hydrateAudioFromIDB().then(()=>{if(BUILD.editor&&state.mode==='menu'&&audioSrcByKey('menu'))playMenuMusic(true);});
+requestAnimationFrame(loop);
+</script>
+
+
+</body></html>
